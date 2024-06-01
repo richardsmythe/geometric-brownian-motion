@@ -1,24 +1,59 @@
-﻿class gbm
+﻿using System;
+using System.Collections.Generic;
+
+class GBM
 {
     /// <summary>
     /// Simulation showing how prices will evolve over time using GBM
     /// </summary>
     static void Main()
     {
-        double[] prices = GeneratePrices();
-        double[] gbmPrices = GeometricBrownianMotion(prices);
+        int numberOfSimulations = 200;
+        int numberOfSteps = 100;
+        double initialPrice = 140.0;
 
-        Console.WriteLine("GBM prices:");
-        foreach (double price in gbmPrices)
+        double[][] monteCarloSimulations = MonteCarloSimulation(numberOfSimulations, numberOfSteps, initialPrice);
+
+        foreach (var simulation in monteCarloSimulations)
         {
-            Console.WriteLine(price);
+            foreach (double price in simulation)
+            {
+                Console.Write(price + " ");
+            }
+            Console.WriteLine();
         }
+        string filePath = "C:\\Users\\rsmythe\\source\\repos\\gbm\\montecarlo.csv";
+        SaveToCsv(monteCarloSimulations, filePath);
+
+        double[] finalPrices = new double[numberOfSimulations];
+        for (int i = 0; i < numberOfSimulations; i++)
+        {
+            finalPrices[i] = monteCarloSimulations[i][numberOfSteps - 1];
+        }
+
+        double meanFinalPrice = CalcMean(finalPrices);
+        double varianceFinalPrice = CalcVariance(finalPrices);
+        double stdDevFinalPrice = Math.Sqrt(varianceFinalPrice);
+
+        Console.WriteLine($"\nMean Final Price: {meanFinalPrice}");
+        Console.WriteLine($"Standard Deviation of Final Price: {stdDevFinalPrice}");
     }
 
-    public static double[] GeneratePrices()
+    public static double[][] MonteCarloSimulation(int numberOfSimulations, int numberOfSteps, double initialPrice)
     {
-        double startingPrice = 140.0;
-        int n = 500;
+        double[][] simulations = new double[numberOfSimulations][];
+
+        for (int i = 0; i < numberOfSimulations; i++)
+        {
+            double[] prices = GeneratePrices(initialPrice, numberOfSteps);
+            simulations[i] = GeometricBrownianMotion(prices);
+        }
+
+        return simulations;
+    }
+
+    public static double[] GeneratePrices(double startingPrice, int n)
+    {
         double volatility = 0.02;
         Random rand = new Random();
 
@@ -27,7 +62,7 @@
 
         for (int i = 1; i < n; i++)
         {
-            // Generate random price fluctuation
+            // add random fluctuation
             double fluctuation = rand.NextDouble() * volatility - (volatility / 2);
             double newPrice = stockPrices[i - 1] * (1 + fluctuation);
             stockPrices.Add(newPrice);
@@ -41,7 +76,7 @@
         double[] gbm = new double[n];
 
         gbm[0] = prices[0];
-        double volitility = Math.Sqrt(CalcLogReturnsVariance(prices));
+        double volatility = Math.Sqrt(CalcLogReturnsVariance(prices));
         double drift = CalcLogReturnDrift(prices); // expected return of the asset over time
         double driftAdjustment = 0.5; // this is the 1/2 x volatility^2 which appears in the GBM formula that accounts for any risk adjustment
 
@@ -49,17 +84,16 @@
         for (int i = 1; i < n; i++)
         {
             double dt = 1.0 / (n - 1); // normalise timestep
-            double r = rand.NextDouble() * volitility * Math.Sqrt(dt);
-            gbm[i] = gbm[i - 1] * Math.Exp(drift - driftAdjustment * (volitility * volitility * dt) + r);
-
+            double r = rand.NextDouble() * volatility * Math.Sqrt(dt);
+            gbm[i] = gbm[i - 1] * Math.Exp(drift - driftAdjustment * (volatility * volatility * dt) + r);
         }
         return gbm;
-
     }
 
     /// <summary>
     /// Compute mean of natural logarithmic return.
-    /// Measure % of change in asset over time using natural logarithm (base e) of price ratio
+    /// Measure % of change in asset over time using natural logarithm (base e) of price ratio.
+    /// Essentially averages out all up and downs to get a trend line
     /// </summary>
     /// <param name="prices"></param>
     /// <returns></returns>
@@ -68,7 +102,7 @@
         List<double> logReturns = new List<double>();
         for (int i = 1; i < prices.Length; i++)
         {
-            double logReturn = Math.Log(prices[i] / prices[i-1]);
+            double logReturn = Math.Log(prices[i] / prices[i - 1]);
             logReturns.Add(logReturn);
         }
         var meanLogReturn = CalcMean(logReturns.ToArray());
@@ -88,9 +122,9 @@
     private static double CalcLogReturnsVariance(double[] prices)
     {
         List<double> logReturns = new List<double>();
-        for (int i = 1  ; i < prices.Length; i++)
+        for (int i = 1; i < prices.Length; i++)
         {
-            double logReturn = Math.Log(prices[i]/ prices[i-1]);
+            double logReturn = Math.Log(prices[i] / prices[i - 1]);
             logReturns.Add(logReturn);
         }
 
@@ -101,9 +135,51 @@
         {
             double deviation = r - mean;
             sumOfSquaredDeviations += deviation * deviation;
-
         }
         return sumOfSquaredDeviations / logReturns.Count;
     }
 
+    private static double CalcVariance(double[] data)
+    {
+        double mean = CalcMean(data);
+        double sumOfSquaredDeviations = 0;
+
+        foreach (double value in data)
+        {
+            double deviation = value - mean;
+            sumOfSquaredDeviations += deviation * deviation;
+        }
+        return sumOfSquaredDeviations / data.Length;
+    }
+    private static void SaveToCsv(double[][] simulations, string filePath)
+    {
+        using (StreamWriter writer = new StreamWriter(filePath))
+        {
+            int numberOfSteps = simulations[0].Length;
+            int numberOfSimulations = simulations.Length;
+ 
+            for (int i = 0; i < numberOfSimulations; i++)
+            {
+                writer.Write($"Simulation{i + 1}");
+                if (i < numberOfSimulations - 1)
+                {
+                    writer.Write(",");
+                }
+            }
+            writer.WriteLine();
+  
+            for (int step = 0; step < numberOfSteps; step++)
+            {
+                for (int sim = 0; sim < numberOfSimulations; sim++)
+                {
+                    writer.Write(simulations[sim][step]);
+                    if (sim < numberOfSimulations - 1)
+                    {
+                        writer.Write(",");
+                    }
+                }
+                writer.WriteLine();
+            }
+        }
+    }
 }
