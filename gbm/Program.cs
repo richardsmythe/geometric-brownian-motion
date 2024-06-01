@@ -8,9 +8,9 @@ class GBM
     /// </summary>
     static void Main()
     {
-        int numberOfSimulations = 200;
-        int numberOfSteps = 100;
-        double initialPrice = 140.0;
+        int numberOfSimulations = 1000;
+        int numberOfSteps = 252; // 1 year of prices
+        double initialPrice = 100.0;
 
         double[][] monteCarloSimulations = MonteCarloSimulation(numberOfSimulations, numberOfSteps, initialPrice);
 
@@ -54,7 +54,7 @@ class GBM
 
     public static double[] GeneratePrices(double startingPrice, int n)
     {
-        double volatility = 0.02;
+        double volatility = 0.05;
         Random rand = new Random();
 
         List<double> stockPrices = new List<double>();
@@ -157,26 +157,20 @@ class GBM
         {
             int numberOfSteps = simulations[0].Length;
             int numberOfSimulations = simulations.Length;
- 
+         
+            writer.Write("Time Step");
             for (int i = 0; i < numberOfSimulations; i++)
             {
-                writer.Write($"Simulation{i + 1}");
-                if (i < numberOfSimulations - 1)
-                {
-                    writer.Write(",");
-                }
+                writer.Write($",Simulation {i + 1}");
             }
             writer.WriteLine();
-  
+
             for (int step = 0; step < numberOfSteps; step++)
             {
+                writer.Write(step);
                 for (int sim = 0; sim < numberOfSimulations; sim++)
                 {
-                    writer.Write(simulations[sim][step]);
-                    if (sim < numberOfSimulations - 1)
-                    {
-                        writer.Write(",");
-                    }
+                    writer.Write($",{simulations[sim][step]}");
                 }
                 writer.WriteLine();
             }
